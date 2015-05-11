@@ -30,10 +30,10 @@ class ArrearageConverter < Converter
 
   def self.import_types(show_hidden = false)
     [
-     {
-       :name => "arrearage",
-       :description => "Import Arrearage spreadsheet"
-     }
+      {
+        :name => "arrearage",
+        :description => "Import Arrearage spreadsheet"
+      }
     ]
   end
 
@@ -104,10 +104,12 @@ class ArrearageConverter < Converter
     end
 
     def jsonmodel
-      if @row['level'].downcase == 'collection'
-        ResourceArrearage.from_row(@row).jsonmodel
-      else
-        ArchivalObjectArrearage.from_row(@row).jsonmodel
+      RequestContext.open(:current_username => "admin") do
+        if @row['level'].downcase == 'collection'
+          ResourceArrearage.from_row(@row).jsonmodel
+        else
+          ArchivalObjectArrearage.from_row(@row).jsonmodel
+        end
       end
     end
 
@@ -117,8 +119,20 @@ class ArrearageConverter < Converter
   class LocationHandler
 
     def self.get_or_create(location)
-      # FIXME: look up the DB for this
-      "/locations/12345"
+      aspace_location = {:building => "The National Library of Australia",
+                         :room => location[:room],
+                         :coordinate_1_label => "Row/drawer",
+                         :coordinate_1_indicator => location[:row],
+                         :coordinate_2_label => "Unit",
+                         :coordinate_2_indicator => location[:unit],
+                         :coordinate_3_label => "Shelf",
+                         :coordinate_3_indicator => location[:shelf]}
+
+      if (location = Location[aspace_location])
+        location.uri
+      else
+        Location.create_from_json(JSONModel::JSONModel(:location).from_hash(aspace_location)).uri
+      end
     end
 
   end
@@ -126,23 +140,83 @@ class ArrearageConverter < Converter
 
   class ParentHandler
 
+    @uris = {}
+
     def self.parent_for(collection_id)
-      # FIXME: Look up the DB for this
-      "/repositories/2/resources/1"
+      if @uris[collection_id]
+        return @uris[collection_id]
+      end
+
+      identifier = parse_identifier(collection_id)
+
+      if (resource = Resource[:identifier => identifier])
+        resource.uri
+      end
     end
 
+
+    def self.parse_identifier(collection_id)
+      JSON((collection_id.split(/\//) + [nil, nil, nil, nil]).take(4))
+    end
+
+
+    def self.record_uri(collection_id, uri)
+      @uris[collection_id] = uri
+    end
   end
 
 
   class AgentHandler
 
-    def self.get_or_create(name, agent_type)
-      # FIXME: Look up the DB for this
-      if agent_type == 'person'
-        "/agents/people/123"
+    # Working around the fact that agent names are using CLOBs here.  Sigh.
+    # With any luck the name tables won't get big enough that a full table scan
+    # matters much.  If it does, we'll need to modify ArchivesSpace to give us
+    # an indexed column to hit when looking up by name.
+
+    CAST_TO_STRING = 'varchar(2048)'
+
+    def self.get_or_create(primary_name, rest_of_name, agent_type)
+      agent = nil
+
+      if agent_type == 'agent_person'
+
+        name = NamePerson.filter(:primary_name => primary_name).filter(Sequel.expr(:rest_of_name).cast_string(CAST_TO_STRING) => rest_of_name).first
+
+        if name
+          agent = AgentPerson[name.agent_person_id]
+        else
+          agent = AgentPerson.create_from_json(JSONModel::JSONModel(:agent_person).from_hash('names' => [
+                                                                                               {
+                                                                                                 'jsonmodel_type' => 'name_person',
+                                                                                                 'primary_name' => primary_name,
+                                                                                                 'rest_of_name' => rest_of_name,
+                                                                                                 'name_order' => 'inverted',
+                                                                                                 'source' => 'local',
+                                                                                                 'sort_name_auto_generate' => true,
+                                                                                               }
+                                                                                             ]))
+        end
+      elsif agent_type == 'agent_corporate_entity'
+        name = NameCorporateEntity.filter(Sequel.expr(:primary_name).cast_string(CAST_TO_STRING) => primary_name).first
+
+        if name
+          agent = AgentCorporateEntity[name.agent_corporate_entity_id]
+        else
+          agent = AgentCorporateEntity.create_from_json(JSONModel::JSONModel(:agent_corporate_entity).from_hash('names' => [
+                                                                                                                  {
+                                                                                                                    'jsonmodel_type' => 'name_corporate_entity',
+                                                                                                                    'primary_name' => primary_name,
+                                                                                                                    'source' => 'local',
+                                                                                                                    'sort_name_auto_generate' => true,
+                                                                                                                  }
+                                                                                                                ]))
+        end
       else
-        "/agents/corporate_entities/123"
+        raise "Unrecognised agent type: #{agent_type}"
       end
+
+
+      agent.uri
     end
 
   end
@@ -178,7 +252,6 @@ class ArrearageConverter < Converter
 
       if row['location_room']
         container_locations << {
-          'jsonmodel_type' => 'container_location',
           'start_date' => Date.today.strftime('%Y-%m-%d'),
           'ref' => ::ArrearageConverter::LocationHandler.get_or_create(:room => row['location_room'],
                                                                        :row => row['location_row'],
@@ -216,7 +289,7 @@ class ArrearageConverter < Converter
       extent_portion = 'whole'
       extent_number = row.fetch('extent_number', '1')
       extent_dimensions = row.fetch('extent_dimensions', nil)
-      extent_physical_details = row.fetch('physical_details', nil)
+      extent_physical_details = row.fetch('extent_physical_details', nil)
 
       [{
          'jsonmodel_type' => 'extent',
@@ -233,10 +306,14 @@ class ArrearageConverter < Converter
 
       result = []
 
-      row.keys.grep(/creator_[0-9]+\z/).each do |creator_column|
-        if row[creator_column]
+      p row
+
+      creator_count = row.keys.grep(/creator_[0-9]+_/).length
+
+      (1..creator_count).each do |i|
+        if row["creator_#{i}_primary_name"]
           result << {
-            'ref' => AgentHandler.get_or_create(row[creator_column], 'agent_person'),
+            'ref' => AgentHandler.get_or_create(row["creator_#{i}_primary_name"], row["creator_#{i}_rest_of_name"], 'agent_person'),
             'role' => 'creator'
           }
         end
@@ -245,7 +322,7 @@ class ArrearageConverter < Converter
       row.keys.grep(/linked_corporate_entity_agent(_[0-9]+\z)?/).each do |corporate_column|
         if row[corporate_column]
           result << {
-            'ref' => AgentHandler.get_or_create(row[corporate_column], 'agent_corporate_entity'),
+            'ref' => AgentHandler.get_or_create(row[corporate_column], nil, 'agent_corporate_entity'),
             'role' => 'creator'
           }
         end
@@ -273,6 +350,23 @@ class ArrearageConverter < Converter
           jsonmodel["id_#{i}"] = elt
         end
       end
+
+      if row['series_statement']
+        jsonmodel['finding_aid_series_statement'] = row['series_statement']
+      end
+
+      if row['catalogued_note']
+        jsonmodel['collection_management'] = {
+          'jsonmodel_type' => 'collection_management',
+          'cataloged_note' => row['catalogued_note']
+        }
+      end
+
+      import_uri = "/repositories/12345/resources/import_#{SecureRandom.hex}"
+
+      ParentHandler.record_uri(row['collection_id'], import_uri)
+
+      jsonmodel['uri'] = import_uri
     end
 
   end
