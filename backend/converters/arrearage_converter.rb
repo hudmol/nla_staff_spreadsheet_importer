@@ -151,6 +151,8 @@ class ArrearageConverter < Converter
 
       if (resource = Resource[:identifier => identifier])
         resource.uri
+      else
+        raise "No parent found matching collection identifier: #{collection_id}"
       end
     end
 
@@ -358,15 +360,47 @@ class ArrearageConverter < Converter
       if row['catalogued_note']
         jsonmodel['collection_management'] = {
           'jsonmodel_type' => 'collection_management',
-          'cataloged_note' => row['catalogued_note']
+          'cataloged_note' => row['catalogued_note'],
+          'processing_status' => 'new'
         }
       end
+
+      jsonmodel.user_defined = load_user_defined_fields(row)
 
       import_uri = "/repositories/12345/resources/import_#{SecureRandom.hex}"
 
       ParentHandler.record_uri(row['collection_id'], import_uri)
 
       jsonmodel['uri'] = import_uri
+    end
+
+
+    def load_user_defined_fields(row)
+      udf = {}
+
+      if row['pres_work_req']
+        if BackendEnumSource.valid?("user_defined_enum_2", row['pres_work_req'])
+          udf['enum_2'] = row['pres_work_req']
+        else
+          udf['text_2'] = row['pres_work_req']
+        end
+      end
+
+
+      if row['digitisation_notes']
+        if BackendEnumSource.valid?("user_defined_enum_3", row['digitisation_notes'])
+          udf['enum_3'] = row['digitisation_notes']
+        else
+          udf['text_5'] = row['digitisation_notes']
+        end
+      end
+
+
+      if udf.empty?
+        nil
+      else
+        {'jsonmodel_type' => 'user_defined'}.merge(udf)
+      end
     end
 
   end
