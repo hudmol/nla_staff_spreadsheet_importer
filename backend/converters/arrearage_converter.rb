@@ -182,7 +182,11 @@ class ArrearageConverter < Converter
 
       if agent_type == 'agent_person'
 
-        name = NamePerson.filter(:primary_name => primary_name).filter(Sequel.expr(:rest_of_name).cast_string(CAST_TO_STRING) => rest_of_name).first
+        name = if ASpaceEnvironment.demo_db?
+                 NamePerson.filter(:primary_name => primary_name).filter(Sequel.expr(:rest_of_name).cast_string(CAST_TO_STRING) => rest_of_name).first
+               else
+                 NamePerson.filter(:primary_name => primary_name).filter(:rest_of_name => rest_of_name).first
+               end
 
         if name
           agent = AgentPerson[name.agent_person_id]
@@ -199,7 +203,12 @@ class ArrearageConverter < Converter
                                                                                              ]))
         end
       elsif agent_type == 'agent_corporate_entity'
-        name = NameCorporateEntity.filter(Sequel.expr(:primary_name).cast_string(CAST_TO_STRING) => primary_name).first
+
+        name = if ASpaceEnvironment.demo_db?
+                 name = NameCorporateEntity.filter(Sequel.expr(:primary_name).cast_string(CAST_TO_STRING) => primary_name).first
+               else
+                 name = NameCorporateEntity.filter(:primary_name => primary_name).first
+               end
 
         if name
           agent = AgentCorporateEntity[name.agent_corporate_entity_id]
