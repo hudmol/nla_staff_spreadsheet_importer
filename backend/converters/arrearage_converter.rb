@@ -68,7 +68,11 @@ class ArrearageConverter < Converter
     # Now print the remaining data rows
     begin
       while (row = rows.next)
-        jsonmodel = RowMapper.new(@headers.zip(row_values(row))).jsonmodel
+        values = row_values(row)
+
+        next if values.compact.empty?
+
+        jsonmodel = RowMapper.new(@headers.zip(values)).jsonmodel
 
         p jsonmodel
 
