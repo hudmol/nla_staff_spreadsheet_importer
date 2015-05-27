@@ -14,6 +14,11 @@ require_relative 'converters/donation_converter'
 
 if ASConstants.VERSION == '1.2.0'
 
+  #
+  # PATCH TO RUN CONVERTER INSIDE THE REQUEST CONTEXT
+  #
+  # See https://github.com/archivesspace/archivesspace/pull/209
+  #
   BatchImportRunner.class_eval do
     def run
       ticker = Ticker.new(@job)
@@ -34,9 +39,6 @@ if ASConstants.VERSION == '1.2.0'
               ticker.log(("=" * 50) + "\n#{filenames[i]}\n" + ("=" * 50)) if filenames[i]
               converter = Converter.for(@json.job['import_type'], input_file.file_path)
               begin
-                #
-                # PATCH TO RUN CONVERTER INSIDE THE REQUEST CONTEXT
-                #
                 RequestContext.open(:create_enums => true,
                                     :current_username => @job.owner.username,
                                     :repo_id => @job.repo_id) do
