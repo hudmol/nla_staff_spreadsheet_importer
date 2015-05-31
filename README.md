@@ -57,7 +57,7 @@ there's one final step.  From your ArchivesSpace directory, run the
 `initialize-plugin` script to install the plugin's dependencies like
 this:
 
-     cd /path/to/your/archivesspace/plugins
+     cd /path/to/your/archivesspace
      scripts/initialize-plugin.sh nla_staff_spreadsheet_importer
 
 This will take a minute or two, but you should see it install the
