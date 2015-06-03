@@ -1,18 +1,6 @@
 require 'date'
 require 'rubyXL'
-
-
-# FIXME: just temporary stuff here.
-if false
-  class PermissiveEnumSource
-    def method_missing(*)
-      true
-    end
-  end
-
-  JSONModel::init(:allow_other_unmapped => AppConfig[:allow_other_unmapped],
-                  :enum_source => PermissiveEnumSource.new)
-end
+require 'set'
 
 
 class ArrearageConverter < Converter
@@ -65,6 +53,12 @@ class ArrearageConverter < Converter
       end
     end
 
+    context = {
+      :collection_handler => CollectionHandler.new,
+      :parent_handler => ParentHandler.new,
+      :position => 0,
+    }
+
     # Now print the remaining data rows
     begin
       while (row = rows.next)
@@ -72,7 +66,7 @@ class ArrearageConverter < Converter
 
         next if values.compact.empty?
 
-        jsonmodel = RowMapper.new(@headers.zip(values)).jsonmodel
+        jsonmodel = RowMapper.new(@headers.zip(values)).jsonmodel(context)
 
         p jsonmodel
 
@@ -103,16 +97,40 @@ class ArrearageConverter < Converter
 
   class RowMapper
 
-    def initialize(row)
-      @row = Hash[row]
+    class RowWrapper
+
+      def initialize(row)
+        @row = row
+        @accessed_properties = Set.new
+      end
+
+      def method_missing(method, *args)
+        if method == :fetch || method == :[]
+          @accessed_properties << args.first
+        end
+
+        @row.send(method, *args)
+      end
+
+      def warn_of_missed_properties
+        (@row.keys - @accessed_properties).each do |missed_property|
+          $stderr.puts("Didn't use property: #{missed_property}")
+        end
+      end
+
     end
 
-    def jsonmodel
+
+    def initialize(row)
+      @row = RowWrapper.new(Hash[row])
+    end
+
+    def jsonmodel(context)
       RequestContext.open(:current_username => "admin") do
-        if @row['level'].downcase == 'collection'
-          ResourceArrearage.from_row(@row).jsonmodel
+        if @row['level'].downcase =~ /collection/
+          ResourceArrearage.from_row(@row, context).jsonmodel
         else
-          ArchivalObjectArrearage.from_row(@row).jsonmodel
+          ArchivalObjectArrearage.from_row(@row, context).jsonmodel
         end
       end
     end
@@ -142,11 +160,13 @@ class ArrearageConverter < Converter
   end
 
 
-  class ParentHandler
+  class CollectionHandler
 
-    @uris = {}
+    def initialize
+      @uris = {}
+    end
 
-    def self.parent_for(collection_id)
+    def parent_for(collection_id)
       if @uris[collection_id]
         return @uris[collection_id]
       end
@@ -161,14 +181,15 @@ class ArrearageConverter < Converter
     end
 
 
-    def self.parse_identifier(collection_id)
+    def parse_identifier(collection_id)
       JSON((collection_id.split(/\//) + [nil, nil, nil, nil]).take(4))
     end
 
 
-    def self.record_uri(collection_id, uri)
+    def record_uri(collection_id, uri)
       @uris[collection_id] = uri
     end
+
   end
 
 
@@ -239,16 +260,23 @@ class ArrearageConverter < Converter
 
   class Arrearage
 
-    attr_reader :row, :jsonmodel
+    attr_reader :row, :jsonmodel, :context
 
-    LEVELS = {'set' => 'file'}
+    LEVELS = {
+      'set' => 'file',
+      'collection (multi)' => 'collection',
+      'collection (single)' => 'collection',
+    }
 
-    def initialize(row, jsonmodel)
+    def initialize(row, jsonmodel, context)
       @row = row
       @jsonmodel = jsonmodel
+      @context = context
 
       jsonmodel.level = LEVELS.fetch(row['level'].downcase, row['level'].downcase)
-      jsonmodel.repository_processing_note = row['processing_note']
+      jsonmodel.repository_processing_note = if row['processing_note']
+                                               "Previous location: " + row['processing_note']
+                                             end
 
       jsonmodel.title = row['title']
       jsonmodel.instances = load_instances(row)
@@ -261,7 +289,6 @@ class ArrearageConverter < Converter
     protected
 
     def load_instances(row)
-      return [] unless row['barcode']
 
       container_locations = []
 
@@ -276,14 +303,30 @@ class ArrearageConverter < Converter
         }
       end
 
+      container = {
+        'type_1' => 'box',
+        'container_locations' => container_locations,
+      }
+
+      if row['indicator_1']
+        container['indicator_1'] = row['indicator_1']
+      else
+        # We need something...
+        container['barcode_1'] = SecureRandom.hex
+        container['indicator_1'] = 'Unknown'
+      end
+
+
+      if row['indicator_2']
+        container['type_2'] = 'piece'
+        container['indicator_2'] = row['indicator_2']
+      end
+
+
       [{
          'jsonmodel_type' => 'instance',
          'instance_type' => 'graphic_materials',
-         'container' => {
-           'barcode_1' => row['barcode'],
-           'indicator_2' => row['parent_container'],
-           'container_locations' => container_locations,
-         }
+         'container' => container
        }]
     end
 
@@ -305,13 +348,14 @@ class ArrearageConverter < Converter
       extent_number = row.fetch('extent_number', '1')
       extent_dimensions = row.fetch('extent_dimensions', nil)
       extent_physical_details = row.fetch('extent_physical_details', nil)
+      extent_type = row.fetch('extent_type', nil)
 
       [{
          'jsonmodel_type' => 'extent',
          'portion' => extent_portion,
          'number' => extent_number,
          'physical_details' => extent_physical_details,
-         'extent_type' => 'photographic_prints',
+         'extent_type' => extent_type,
          'dimensions' => extent_dimensions,
        }]
     end
@@ -352,12 +396,12 @@ class ArrearageConverter < Converter
 
   class ResourceArrearage < Arrearage
 
-    def self.from_row(row)
-      new(row, ASpaceImport::JSONModel(:resource).new)
+    def self.from_row(row, context)
+      new(row, ASpaceImport::JSONModel(:resource).new, context)
     end
 
 
-    def initialize(row, jsonmodel)
+    def initialize(row, jsonmodel, context)
       super
 
       if row['collection_id']
@@ -370,42 +414,34 @@ class ArrearageConverter < Converter
         jsonmodel['finding_aid_series_statement'] = row['series_statement']
       end
 
-      if row['catalogued_note']
-        jsonmodel['collection_management'] = {
-          'jsonmodel_type' => 'collection_management',
-          'cataloged_note' => row['catalogued_note'],
-          'processing_status' => 'new'
-        }
-      end
-
       jsonmodel.user_defined = load_user_defined_fields(row)
 
       import_uri = "/repositories/12345/resources/import_#{SecureRandom.hex}"
 
-      ParentHandler.record_uri(row['collection_id'], import_uri)
+      context.fetch(:collection_handler).record_uri(row['collection_id'], import_uri)
 
       jsonmodel['uri'] = import_uri
+      jsonmodel['position'] = (context[:position] += 1)
     end
 
 
     def load_user_defined_fields(row)
       udf = {}
 
+      if row['bib_collection_level']
+        udf['integer_2'] = row['bib_collection_level']
+      end
+
       if row['pres_work_req']
-        if BackendEnumSource.valid?("user_defined_enum_2", row['pres_work_req'])
-          udf['enum_2'] = row['pres_work_req']
-        else
-          udf['text_2'] = row['pres_work_req']
+        if row['pres_work_req'] =~ /y/i
+          udf['enum_2'] = 'Preservation Required'
+        elsif row['pres_work_req'] =~ /n/i
+          udf['enum_2'] = 'Preservation Not Required'
         end
       end
 
-
       if row['digitisation_notes']
-        if BackendEnumSource.valid?("user_defined_enum_3", row['digitisation_notes'])
-          udf['enum_3'] = row['digitisation_notes']
-        else
-          udf['text_5'] = row['digitisation_notes']
-        end
+        udf['text_5'] = row['digitisation_notes']
       end
 
 
@@ -419,25 +455,83 @@ class ArrearageConverter < Converter
   end
 
 
-  class ArchivalObjectArrearage < Arrearage
+  class ParentHandler
 
-    def self.from_row(row)
-      new(row, ASpaceImport::JSONModel(:archival_object).new)
+    def set_uri(row, uri)
+      @current_hierarchy ||= {}
+
+      collection_hierarchy = parse_collection_hierarchy(row)
+
+      # Chop the hierarchy back to the level of the current record
+      @current_hierarchy = Hash[@current_hierarchy.map {|k, v|
+                                  if k < collection_hierarchy
+                                    [k, v]
+                                  end
+                                }.compact]
+
+      # Record the URI of the current record
+      @current_hierarchy[collection_hierarchy] = uri
     end
 
 
-    def initialize(row, jsonmodel)
+    def parent_for(row)
+      collection_hierarchy = parse_collection_hierarchy(row)
+
+      # Level 1 will be a resource record, Level 2 is a top-level AO (no
+      # parent), so Level 3 is the first one we care about.
+      if collection_hierarchy > 2
+        parent_level = collection_hierarchy - 1
+
+        @current_hierarchy.fetch(parent_level)
+      else
+        nil
+      end
+    end
+
+
+    private
+
+    def parse_collection_hierarchy(row)
+      begin
+        Integer(row['collection_hierarchy'])
+      rescue ArgumentError
+        raise ArgumentError.new("Collection hierarchy was not a number: #{row['collection_hierarchy']}")
+      end
+    end
+
+  end
+
+
+  class ArchivalObjectArrearage < Arrearage
+
+    def self.from_row(row, context)
+      new(row, ASpaceImport::JSONModel(:archival_object).new, context)
+    end
+
+
+    def initialize(row, jsonmodel, context)
       super
 
-      if row['component_id']
-        jsonmodel.component_id = row['component_id']
+      import_uri = "/repositories/12345/archival_objects/import_#{SecureRandom.hex}"
+      jsonmodel['uri'] = import_uri
+      jsonmodel['position'] = (context[:position] += 1)
+
+
+      component_id = [row['component_id'], row['item_id']].compact.join("")
+
+      if !component_id.empty?
+        jsonmodel.component_id = component_id
       end
 
       collection_id = row.fetch('collection_id') {
         raise "Missing value for collection ID"
       }
 
-      jsonmodel.resource = {'ref' => ParentHandler.parent_for(collection_id)}
+      jsonmodel.resource = {'ref' => context.fetch(:collection_handler).parent_for(collection_id)}
+
+      context.fetch(:parent_handler).set_uri(row, import_uri)
+
+      jsonmodel.parent = {'ref' => context.fetch(:parent_handler).parent_for(row)}
     end
 
   end
@@ -446,7 +540,6 @@ end
 
 
 
-# ArrearageConverter.new("/home/mst/projects/nla-archivesspace/specs/Arrearage Template.xlsx").run
 #
 # Questions:
 #
