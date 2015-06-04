@@ -128,45 +128,55 @@ class DonationConverter < Converter
   end
 
 
-  def add_item(hash)
-    @records << JSONModel::JSONModel(:archival_object).from_hash({
-                  :uri => "/repositories/12345/archival_objects/import_#{SecureRandom.hex}",
-                  :level => 'item',
-                  :title => hash['Item Description'],
-                  :instances => [{
-                    :instance_type => 'mixed_materials',
-                    :container => {
-                      :type_1 => 'box',
-                      :indicator_1 => hash['Box No'],
-                      :type_2 => 'folder',
-                      :indicator_2 => hash['File no/ control no']
-                    }
-                  }],
-                  :dates => [{
-                    :date_type => hash['Date Range'] =~ /-/ ? 'inclusive' : 'single',
-                    :label => 'existence',
-                    :expression => hash['Date Range'] || "No date provided"
-                  }],
-                  :collection_management => {
-                    :cataloged_note => hash['Comments']
-                  },
-                  :resource => {
-                    :ref => @resource_uri
-                  },
-                  :parent => {
-                    :ref => @series_uri
-                  }
-                })
+  def add_item(row)
+
+    ao_hash = {
+      :uri => "/repositories/12345/archival_objects/import_#{SecureRandom.hex}",
+      :level => 'item',
+      :title => row['Item Description'],
+      :ref_id => row['File no/ control no'],
+      :instances => [{
+                       :instance_type => 'accession',
+                       :container => {
+                         :type_1 => 'box',
+                         :indicator_1 => row['Box No']
+                       }
+                     }],
+      :dates => [format_date(row['Date Range'])],
+      :resource => {
+        :ref => @resource_uri
+      },
+      :parent => {
+        :ref => @series_uri
+      }
+    }
+
+    if row['Comments']
+      ao_hash['notes'] = [{
+        :jsonmodel_type => 'note_multipart',
+        :type => 'scopecontent',
+        :subnotes =>[{
+          :jsonmodel_type => 'note_text',
+          :content => row['Comments']
+        }]
+      }]
+    end
+
+    @records << JSONModel::JSONModel(:archival_object).from_hash(ao_hash)
+  end
+
+
+  def format_date(date_string)
+    {
+      :date_type => date_string =~ /-/ ? 'inclusive' : 'single',
+      :label => 'existence',
+      :expression => date_string || "No date provided"
+    }
   end
 
 
   def row_values(row)
     (0...row.size).map {|i| (row[i] && row[i].value) ? row[i].value.to_s.strip : nil}
-  end
-
-
-  def parse_identifier(collection_id)
-    JSON((collection_id.split(/\//) + [nil, nil, nil, nil]).take(4))
   end
 
 
