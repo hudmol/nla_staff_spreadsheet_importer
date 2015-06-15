@@ -45,10 +45,10 @@ class DonationConverter < Converter
 
     rows.next # skip "Office Use Only" row
 
-    resource_identifier_row = rows.next
+    office_use_only_row = rows.next
     resource_title_row = rows.next
 
-    @resource_uri = get_or_create_resource(resource_identifier_row, resource_title_row)
+    @resource_uri = get_or_create_resource(office_use_only_row, resource_title_row)
 
     if @resource_uri.nil?
       raise "No resource defined"
@@ -62,13 +62,15 @@ class DonationConverter < Converter
 
         next if values.compact.empty?
 
-        @series_uri = get_or_create_series(values[2])
+        values_map = Hash[@headers.zip(values)]
 
-        if @series_uri.nil?
-          raise "No series defined for item: #{values}"
+        if values_map["Series Title"]
+          @series_uri = get_or_create_series(values_map)
         end
 
-        add_item(Hash[@headers.zip(values)])
+        if values_map["Item Description"]
+          add_file(values_map)
+        end
       end
     rescue StopIteration
     end
@@ -93,34 +95,35 @@ class DonationConverter < Converter
 
   private
 
-  def get_or_create_resource(identifier_row, title_row)
-    identifier_values = row_values(identifier_row)
-    identifier_json = JSON(identifier_values[1,4])
+  def get_or_create_resource(office_use_row, title_row)
+    office_use_values = row_values(office_use_row)
+    title_values = row_values(title_row)
+    identifier_json = JSON(office_use_values[1,2] + [nil, nil])
 
     if (resource = Resource[:identifier => identifier_json])
       resource.uri
     else
       uri = "/repositories/12345/resources/import_#{SecureRandom.hex}"
-      title = row_values(title_row)[1]
+      title = title_values[1]
+
+      extent = {
+        :portion => 'whole',
+        :extent_type => 'metres',
+        :container_summary => office_use_values[3],
+        :number => office_use_values[4],
+      }
+
+      date = format_date(office_use_values[5])
 
       @records << JSONModel::JSONModel(:resource).from_hash({
                     :uri => uri,
-                    :id_0 => identifier_values[1],
-                    :id_1 => identifier_values[2],
-                    :id_2 => identifier_values[3],
-                    :id_3 => identifier_values[4],
+                    :id_0 => office_use_values[1],
+                    :id_1 => office_use_values[2],
                     :title => title,
                     :level => 'collection',
-                    :extents => [{
-                      :portion => 'whole',
-                      :number => '0',
-                      :extent_type => 'linear_feet'
-                    }],
-                    :dates => [{
-                      :date_type => 'single',
-                      :label => 'other',
-                      :expression => "Imported from donor spreadsheet on #{Date.today}"
-                    }]
+                    :extents => [extent],
+                    :dates => [date].compact,
+                    :language => 'eng',
                   })
 
       uri
@@ -128,48 +131,57 @@ class DonationConverter < Converter
   end
 
 
-  def add_item(row)
+  def get_or_create_series(row)
+    return @series_uri if row['Series Title'].nil?
 
-    ao_hash = {
-      :uri => "/repositories/12345/archival_objects/import_#{SecureRandom.hex}",
-      :level => 'item',
-      :title => row['Item Description'],
-      :ref_id => row['File no/ control no'],
-      :instances => [{
-                       :instance_type => 'accession',
-                       :container => {
-                         :type_1 => 'box',
-                         :indicator_1 => row['Box No']
-                       }
-                     }],
-      :dates => [format_date(row['Date Range'])],
-      :resource => {
-        :ref => @resource_uri
-      },
-      :parent => {
-        :ref => @series_uri
-      }
-    }
+    series_hash = format_record(row).merge({
+      :title => row['Series Title'],
+      :level => 'series'
+    })
 
-    if row['Comments']
-      ao_hash['notes'] = [{
-        :jsonmodel_type => 'note_multipart',
-        :type => 'scopecontent',
-        :subnotes =>[{
-          :jsonmodel_type => 'note_text',
-          :content => row['Comments']
-        }]
-      }]
+    # if file defined in same row, do not add dates, instances
+    # or component id to this series record
+    if row["Item Description"]
+      [:dates, :instances, :component_id].map{|field| series_hash.delete(field)}
     end
 
-    @records << JSONModel::JSONModel(:archival_object).from_hash(ao_hash)
+    @records << JSONModel::JSONModel(:archival_object).from_hash(series_hash)
+
+    series_hash[:uri]
+  end
+
+
+  def add_file(row)
+    file_hash = format_record(row).merge({
+      :title => row['Item Description'],
+      :level => 'file'
+    })
+
+    file_hash[:parent] = { :ref => @series_uri } if @series_uri
+
+    @records << JSONModel::JSONModel(:archival_object).from_hash(file_hash)
+  end
+
+
+  def format_box(box_no)
+    return if box_no.nil?
+
+    {
+      :instance_type => 'accession',
+      :container => {
+        :type_1 => 'box',
+        :indicator_1 => box_no
+      }
+    }
   end
 
 
   def format_date(date_string)
+    return if date_string.nil?
+
     {
       :date_type => date_string =~ /-/ ? 'inclusive' : 'single',
-      :label => 'existence',
+      :label => 'creation',
       :expression => date_string || "No date provided"
     }
   end
@@ -180,21 +192,29 @@ class DonationConverter < Converter
   end
 
 
+  def format_record(row)
+    record_hash = {
+      :uri => "/repositories/12345/archival_objects/import_#{SecureRandom.hex}",
+      :component_id => row['File no/ control no'],
+      :instances => [format_box(row['Box No'])].compact,
+      :dates => [format_date(row['Date Range'])].compact,
+      :resource => {
+        :ref => @resource_uri
+      },
+    }
 
-  def get_or_create_series(title)
-    return @series_uri if title.nil?
+    if row['Comments']
+      record_hash['notes'] = [{
+                                :jsonmodel_type => 'note_multipart',
+                                :type => 'scopecontent',
+                                :subnotes =>[{
+                                               :jsonmodel_type => 'note_text',
+                                               :content => row['Comments']
+                                             }]
+                              }]
+    end
 
-    uri = "/repositories/12345/archival_objects/import_#{SecureRandom.hex}"
-
-    @records << JSONModel::JSONModel(:archival_object).from_hash({
-                 :title => title,
-                 :level => 'series',
-                 :uri => uri,
-                 :resource => {
-                   :ref => @resource_uri
-                 }
-               })
-
-    uri
+    record_hash
   end
+
 end
