@@ -141,13 +141,13 @@ class ArrearageConverter < Converter
   class LocationHandler
 
     def self.get_or_create(location)
-      aspace_location = {:building => "The National Library of Australia",
+      aspace_location = {:building => "NLA",
                          :room => location[:room],
-                         :coordinate_1_label => "Row/drawer",
+                         :coordinate_1_label => "Row",
                          :coordinate_1_indicator => location[:row],
                          :coordinate_2_label => "Unit",
                          :coordinate_2_indicator => location[:unit],
-                         :coordinate_3_label => "Shelf",
+                         :coordinate_3_label => "Shelf/Drawer",
                          :coordinate_3_indicator => location[:shelf]}
 
       if (location = Location[aspace_location])
@@ -279,6 +279,7 @@ class ArrearageConverter < Converter
                                              end
 
       jsonmodel.title = row['title']
+      jsonmodel.language = 'eng'
       jsonmodel.instances = load_instances(row)
       jsonmodel.dates = load_dates(row)
       jsonmodel.extents = load_extents(row)
@@ -304,7 +305,7 @@ class ArrearageConverter < Converter
       end
 
       container = {
-        'type_1' => 'box',
+        'type_1' => row.fetch('type_1', 'box'),
         'container_locations' => container_locations,
       }
 
@@ -318,16 +319,21 @@ class ArrearageConverter < Converter
 
 
       if row['indicator_2']
-        container['type_2'] = 'piece'
+        container['type_2'] = row.fetch('type_2', 'piece')
         container['indicator_2'] = row['indicator_2']
       end
 
 
-      [{
-         'jsonmodel_type' => 'instance',
-         'instance_type' => 'graphic_materials',
-         'container' => container
-       }]
+      if container['container_locations'].empty? && !row['indicator_1'] && !row['indicator_2']
+        # No container information provided.  No instance to report!
+        return []
+      else
+        [{
+           'jsonmodel_type' => 'instance',
+           'instance_type' => 'graphic_materials',
+           'container' => container
+         }]
+      end
     end
 
 
@@ -405,9 +411,7 @@ class ArrearageConverter < Converter
       super
 
       if row['collection_id']
-        row['collection_id'].split(/\//).each_with_index do |elt, i|
-          jsonmodel["id_#{i}"] = elt
-        end
+        jsonmodel['id_0'] = row['collection_id']
       end
 
       if row['series_statement']
