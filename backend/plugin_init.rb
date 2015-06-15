@@ -12,7 +12,7 @@ end
 
 require_relative 'converters/donation_converter'
 
-if ASConstants.VERSION == '1.2.0'
+if ASConstants.VERSION =~ /1\.2\.0/
 
   #
   # PATCH TO RUN CONVERTER INSIDE THE REQUEST CONTEXT
