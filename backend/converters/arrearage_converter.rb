@@ -279,7 +279,6 @@ class ArrearageConverter < Converter
                                              end
 
       jsonmodel.title = row['title']
-      jsonmodel.language = 'eng'
       jsonmodel.instances = load_instances(row)
       jsonmodel.dates = load_dates(row)
       jsonmodel.extents = load_extents(row)
@@ -409,6 +408,8 @@ class ArrearageConverter < Converter
 
     def initialize(row, jsonmodel, context)
       super
+
+      jsonmodel.language = 'eng'
 
       if row['collection_id']
         jsonmodel['id_0'] = row['collection_id']
