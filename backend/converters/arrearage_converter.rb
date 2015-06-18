@@ -341,7 +341,7 @@ class ArrearageConverter < Converter
 
       [{
          'jsonmodel_type' => 'date',
-         'date_type' => 'single',
+         'date_type' => 'inclusive',
          'expression' => row['date'],
          'label' => 'creation',
        }]
