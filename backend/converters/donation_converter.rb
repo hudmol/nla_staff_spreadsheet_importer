@@ -64,6 +64,10 @@ class DonationConverter < Converter
 
         values_map = Hash[@headers.zip(values)]
 
+        if values_map["Consignment"]
+          @class_uri = get_or_create_class(values_map)
+        end
+
         if values_map["Series Title"]
           @series_uri = get_or_create_series(values_map)
         end
@@ -98,27 +102,27 @@ class DonationConverter < Converter
   def get_or_create_resource(office_use_row, title_row)
     office_use_values = row_values(office_use_row)
     title_values = row_values(title_row)
-    identifier_json = JSON(office_use_values[1,2] + [nil, nil])
+    identifier_json = JSON(office_use_values[2,3] + [nil, nil])
 
     if (resource = Resource[:identifier => identifier_json])
       resource.uri
     else
       uri = "/repositories/12345/resources/import_#{SecureRandom.hex}"
-      title = title_values[1]
+      title = title_values[3]
 
       extent = {
         :portion => 'whole',
         :extent_type => 'metres',
-        :container_summary => office_use_values[3],
+        :container_summary => office_use_values[5],
         :number => office_use_values[4],
       }
 
-      date = format_date(office_use_values[5])
+      date = format_date(office_use_values[6])
 
       @records << JSONModel::JSONModel(:resource).from_hash({
                     :uri => uri,
-                    :id_0 => office_use_values[1],
-                    :id_1 => office_use_values[2],
+                    :id_0 => office_use_values[2],
+                    :id_1 => office_use_values[3],
                     :title => title,
                     :level => 'collection',
                     :extents => [extent],
@@ -128,6 +132,23 @@ class DonationConverter < Converter
 
       uri
     end
+  end
+
+
+  def get_or_create_class(row)
+    return @class_uri if row['Consignment'].nil?
+
+    class_hash = format_record(row).merge({
+      :title => "Consignment #{row['Consignment']}",
+      :level => 'class'
+    })
+
+    # consignments don't have these things
+    [:dates, :instances, :component_id].map{|field| class_hash.delete(field)}
+
+    @records << JSONModel::JSONModel(:archival_object).from_hash(class_hash)
+
+    class_hash[:uri]
   end
 
 
@@ -145,6 +166,8 @@ class DonationConverter < Converter
       [:dates, :instances, :component_id].map{|field| series_hash.delete(field)}
     end
 
+    series_hash[:parent] = { :ref => @class_uri } if @class_uri
+
     @records << JSONModel::JSONModel(:archival_object).from_hash(series_hash)
 
     series_hash[:uri]
@@ -157,19 +180,20 @@ class DonationConverter < Converter
       :level => 'file'
     })
 
+    file_hash[:parent] = { :ref => @class_uri } if @class_uri
     file_hash[:parent] = { :ref => @series_uri } if @series_uri
 
     @records << JSONModel::JSONModel(:archival_object).from_hash(file_hash)
   end
 
 
-  def format_box(box_no)
+  def format_box(box_no, box_type)
     return if box_no.nil?
 
     {
       :instance_type => 'accession',
       :container => {
-        :type_1 => 'box',
+        :type_1 => box_type || 'Box',
         :indicator_1 => box_no
       }
     }
@@ -196,7 +220,7 @@ class DonationConverter < Converter
     record_hash = {
       :uri => "/repositories/12345/archival_objects/import_#{SecureRandom.hex}",
       :component_id => row['File no/ control no'],
-      :instances => [format_box(row['Box No'])].compact,
+      :instances => [format_box(row['Box No'], row['Box Type'])].compact,
       :dates => [format_date(row['Date Range'])].compact,
       :resource => {
         :ref => @resource_uri
