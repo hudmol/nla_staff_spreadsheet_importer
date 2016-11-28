@@ -2,3 +2,4 @@ en:
   import_job:
     import_type_arrearage: Arrearage spreadsheet
     import_type_donation: Donor Box List spreadsheet
+    import_type_dlc: Digital Library Collections CSV
