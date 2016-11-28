@@ -44,6 +44,9 @@ class DLCConverter < Converter
       'File' => 'file',
       'Item' => 'item'
     }
+
+    @digital_object_uris = {}
+    @top_container_uris = {}
   end
 
 
@@ -163,6 +166,48 @@ class DLCConverter < Converter
   end
 
 
+  def get_or_create_digital_object(id, title)
+    if (digital_object = DigitalObject[:digital_object_id => id])
+      digital_object.uri
+    elsif @digital_object_uris[id]
+      @digital_object_uris[id]
+    else
+      uri = "/repositories/12345/digital_objects/import_#{SecureRandom.hex}"
+
+      do_hash = {
+        :uri => uri,
+        :digital_object_id => id,
+        :title => title
+      }
+
+      @records << JSONModel::JSONModel(:digital_object).from_hash(do_hash)
+      @digital_object_uris[id] = uri
+
+      uri
+    end
+  end
+
+
+  def get_or_create_top_container(type, indicator)
+    if @top_container_uris[type + indicator]
+      @top_container_uris[type + indicator]
+    else
+      uri = "/repositories/12345/top_containers/import_#{SecureRandom.hex}"
+
+      tc_hash = {
+        :uri => uri,
+        :type => type,
+        :indicator => indicator
+      }
+
+      @records << JSONModel::JSONModel(:top_container).from_hash(tc_hash)
+      @top_container_uris[type + indicator] = uri
+
+      uri
+    end
+  end
+
+
   def add_file(row)
     file_hash = format_record(row)
 
@@ -213,6 +258,25 @@ class DLCConverter < Converter
 
 
   def format_instance(row)
+    return unless row['container_type'] && row['container_indicator']
+
+    if row['container_type'] == 'Digital Item'
+      {
+        :instance_type => 'digital_object',
+        :digital_object => {
+          :ref => get_or_create_digital_object(row['container_indicator'], row['title'])
+        }
+      }
+    else
+      {
+        :instance_type => 'accession',
+        :sub_container => {
+          :top_container => {
+            :ref => get_or_create_top_container(row['container_type'], row['container_indicator'])
+          }
+        }
+      }
+    end
 
   end
 
@@ -231,6 +295,7 @@ class DLCConverter < Converter
       :level => format_level(row['level']),
       :dates => [format_date(row['date'])].compact,
       :extents => [format_extent(row)].compact,
+      :instances => [format_instance(row)].compact,
       :notes => [],
       :resource => {
         :ref => @resource_uri
