@@ -1,7 +1,19 @@
-Arrearage spreadsheet importer plugin
-======================================
+NLA Staff Spreadsheet Importer Plugin
+=====================================
 
-This plugin introduces a new import type that takes a spreadsheet
+An ArchivesSpace (v1.5.2) plugin developed for the National Library of Australia by Hudson Molonglo.
+
+It adds three new Import Types to the Import Data Job Type.
+
+  * Arrearage spreadsheet
+  * Donor Box List spreadsheet
+  * Digital Library Collections CSV
+
+
+Arrearage spreadsheet
+---------------------
+
+Takes a spreadsheet
 describing a collection (with one record per row) and creates the
 following types of records within ArchivesSpace:
 
@@ -33,6 +45,33 @@ per row.  Each record can describe either a Resource record (with a
 record (any other "Level of description" value).  Every row must have
 a **Collection Number** value to designate the collection it
 defines/belongs to.
+
+
+Donor Box List spreadsheet
+--------------------------
+
+Takes a spreadsheet describing donated collections. A template is provided
+to the donor for completion. It is then imported by NLA staff. The template
+is included here:
+
+     https://github.com/hudmol/nla_staff_spreadsheet_importer/blob/master/samples/Donor%20Box%20List%20Template.xlsx
+
+And there are a few examples showing different structures included in the samples directory also:
+
+     https://github.com/hudmol/nla_staff_spreadsheet_importer/tree/master/samples
+
+
+Digital Library Collections CSV
+-------------------------------
+
+Takes a CSV file exported from the Digital Library Collections system. It creates a single resource
+record with class, series, file and item records below it. It also creates linked agent, digital object
+and top container records.
+
+A sample CSV file is included here:
+
+     https://github.com/hudmol/nla_staff_spreadsheet_importer/blob/master/samples/dlc.csv
+
 
 ## Installation
 
@@ -82,11 +121,12 @@ safe bet).  From the  `Create` menu select `Background Jobs`, and this
 will load the *New Background Job* page.
 
 From here, select a `Job Type` of `Import Data` and an `Import Type`
-of `"Arrearage spreadsheet`.
+of `Arrearage spreadsheet`, `Donor Box List spreadsheet`, or
+`Digital Library Collections CSV`.
 
 Finally, click "Add file" and select your spreadsheet file to be
 imported or, if your computer has a mouse, you can drag-and-drop the
-file straight into ArchivesSpace.  Wow!
+file straight into ArchivesSpace.
 
 If everything goes well, you should see output that shows records
 being created:
