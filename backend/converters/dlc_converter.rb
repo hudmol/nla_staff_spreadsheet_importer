@@ -71,6 +71,7 @@ class DLCConverter < Converter
 
         when 'class'
           @class_uri = get_or_create_class(values_map)
+          @series_uri = nil
 
         when 'series'
           @series_uri = get_or_create_series(values_map)
@@ -133,6 +134,7 @@ class DLCConverter < Converter
                     :level => 'collection',
                     :extents => [format_extent(row, :portion => 'whole')].compact,
                     :dates => [date].compact,
+                    :linked_agents => [format_agent(row)].compact,
                     :user_defined => user_defined,
                     :language => 'eng',
                   })
@@ -208,6 +210,31 @@ class DLCConverter < Converter
   end
 
 
+  def get_or_create_agent(primary_name)
+    if (name = NamePerson[:primary_name => primary_name])
+      AgentPerson[name.agent_person_id].uri
+    else
+      uri = "/agents/people/import_#{SecureRandom.hex}"
+
+      agent_hash = {
+        :uri => uri,
+        :names => [
+                   {
+                     :primary_name => primary_name,
+                     :sort_name_auto_generate => true,
+                     :name_order => 'inverted',
+                     :source => 'local'
+                   }
+                  ]
+      }
+
+      @records << JSONModel::JSONModel(:agent_person).from_hash(agent_hash)
+
+      uri
+    end
+  end
+
+
   def add_file(row)
     file_hash = format_record(row)
 
@@ -277,7 +304,16 @@ class DLCConverter < Converter
         }
       }
     end
+  end
 
+
+  def format_agent(row)
+    return unless row['creator']
+
+    {
+      :role => 'creator',
+      :ref => get_or_create_agent(row['creator'])
+    }
   end
 
 
