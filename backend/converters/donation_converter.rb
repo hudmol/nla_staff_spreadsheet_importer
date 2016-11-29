@@ -66,6 +66,7 @@ class DonationConverter < Converter
 
         if values_map["Consignment"]
           @class_uri = get_or_create_class(values_map)
+          @series_uri = nil
         end
 
         if values_map["Series Title"]
