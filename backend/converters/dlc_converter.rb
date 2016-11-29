@@ -1,6 +1,3 @@
-require 'date'
-
-
 class DLCConverter < Converter
 
   def self.instance_for(type, input_file)
