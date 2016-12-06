@@ -293,7 +293,7 @@ class DLCConverter < Converter
       }
     else
       {
-        :instance_type => 'accession',
+        :instance_type => 'mixed_materials',
         :sub_container => {
           :top_container => {
             :ref => get_or_create_top_container(row['container_type'], row['container_indicator'])
