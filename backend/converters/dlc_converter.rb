@@ -115,10 +115,6 @@ class DLCConverter < Converter
       uri = "/repositories/12345/resources/import_#{SecureRandom.hex}"
       title = row['title']
 
-      user_defined = {
-        :integer_2 => row['ud_int_2']
-      }
-
       date = format_date(row['date'])
 
       @records << JSONModel::JSONModel(:resource).from_hash({
@@ -132,7 +128,7 @@ class DLCConverter < Converter
                     :extents => [format_extent(row, :portion => 'whole')].compact,
                     :dates => [date].compact,
                     :linked_agents => [format_agent(row)].compact,
-                    :user_defined => user_defined,
+                    :user_defined => format_user_defined(row),
                     :language => 'eng',
                   })
 
@@ -165,7 +161,8 @@ class DLCConverter < Converter
   end
 
 
-  def get_or_create_digital_object(id, title)
+  def get_or_create_digital_object(row)
+    id = row['container_indicator']
     if (digital_object = DigitalObject[:digital_object_id => id])
       digital_object.uri
     elsif @digital_object_uris[id]
@@ -176,7 +173,8 @@ class DLCConverter < Converter
       do_hash = {
         :uri => uri,
         :digital_object_id => id,
-        :title => title
+        :title => row['title'],
+        :user_defined => format_user_defined(row)
       }
 
       @records << JSONModel::JSONModel(:digital_object).from_hash(do_hash)
@@ -288,7 +286,7 @@ class DLCConverter < Converter
       {
         :instance_type => 'digital_object',
         :digital_object => {
-          :ref => get_or_create_digital_object(row['container_indicator'], row['title'])
+          :ref => get_or_create_digital_object(row)
         }
       }
     else
@@ -313,6 +311,14 @@ class DLCConverter < Converter
     }
   end
 
+
+  def format_user_defined(row)
+    if row['ud_int_2']
+      {
+        :integer_2 => row['ud_int_2']
+      }
+    end
+  end
 
   def row_values(row)
     (0...row.size).map {|i| row[i] ? row[i].to_s.strip : nil}
