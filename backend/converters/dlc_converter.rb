@@ -174,6 +174,7 @@ class DLCConverter < Converter
         :uri => uri,
         :digital_object_id => id,
         :title => row['title'],
+        :linked_agents => [format_agent(row)].compact,
         :user_defined => format_user_defined(row)
       }
 
@@ -336,6 +337,7 @@ class DLCConverter < Converter
       :extents => [format_extent(row)].compact,
       :instances => [format_instance(row)].compact,
       :notes => [],
+      :linked_agents => [format_agent(row)].compact,
       :resource => {
         :ref => @resource_uri
       },
