@@ -31,8 +31,8 @@ class DLCConverter < Converter
     @records = []
 
     @columns = %w(level resource_id ud_int_2 container_type container_indicator component_id
-                  title date extent_number extent_type extent_physical_details extent_dimensions
-                  scopecontent_note creator processinfo_note)
+                  title date extent_number extent_type extent_container_summary extent_physical_details
+                  extent_dimensions scopecontent_note creator processinfo_note)
 
     @level_map = {
       'Collection' => 'collection',
@@ -273,6 +273,7 @@ class DLCConverter < Converter
     {
       :portion => opts.fetch(:portion) { 'part' },
       :extent_type => row['extent_type'],
+      :container_summary => row['extent_container_summary'],
       :number => row['extent_number'],
       :physical_details => row['extent_physical_details'],
       :dimensions => row['extent_dimensions']
