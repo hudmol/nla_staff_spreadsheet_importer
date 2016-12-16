@@ -105,7 +105,10 @@ class DLCConverter < Converter
   private
 
   def get_or_create_resource(row)
-    id_a = row['resource_id'].split(/\s+/)
+    # turns out Emma wants the whole id in id_0
+    # leaving this stuff here because, when, you know ...
+    # id_a = row['resource_id'].split(/\s+/)
+    id_a = [row['resource_id']]
     id_a = id_a + Array.new(4 - id_a.length)
     identifier_json = JSON(id_a)
 
