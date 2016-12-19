@@ -160,6 +160,64 @@ class ArrearageConverter < Converter
   end
 
 
+  class TopContainerHandler
+
+    # sorry
+
+    @@top_containers = {}
+
+    def self.key_for(top_container)
+      key = "#{top_container[:type]}: #{top_container[:indicator]}"
+      key += " #{top_container[:barcode]}" if top_container.has_key?(:barcode)
+      key
+    end
+
+
+    def self.build(top_container)
+      {
+        :type => top_container.fetch(:type, 'box'),
+        :indicator => top_container.fetch(:indicator, 'Unknown'),
+        :container_locations => top_container.fetch(:container_locations, [])
+      }
+    end
+
+
+    def self.uri_or_false(top_container)
+      tc = @@top_containers.fetch(key_for(build(top_container)), false)
+      return false unless tc
+      tc[:uri]
+    end
+
+
+    def self.get_or_create(top_container)
+      tc = build(top_container)
+
+      unless top_container[:indicator]
+        tc[:barcode] = SecureRandom.hex
+        $stderr.puts("Found a row without a top_container indicator, so made up a barcode for it: #{tc[:barcode]}")
+      end
+
+      tc_key = key_for(tc)
+
+      if existing_tc = @@top_containers.fetch(tc_key, false)
+
+        if existing_tc[:container_locations].first['ref'] != tc[:container_locations].first['ref']
+          raise "Found two containers with the same type and indicator (#{tc_key}) but different locations. " +
+                "Please fix and rerun. Aborting import ..."
+        end
+
+        existing_tc[:uri]
+
+      else
+        tc[:uri] = TopContainer.create_from_json(JSONModel::JSONModel(:top_container).from_hash(tc)).uri
+        @@top_containers[tc_key] = tc
+        tc[:uri]
+      end
+    end
+
+  end
+
+
   class CollectionHandler
 
     def initialize
@@ -290,10 +348,11 @@ class ArrearageConverter < Converter
 
     def load_instances(row)
 
-      container_locations = []
+      tc_uri = false
+      locations = []
 
       if row['location_room']
-        container_locations << {
+        locations << {
           'start_date' => Date.today.strftime('%Y-%m-%d'),
           'ref' => ::ArrearageConverter::LocationHandler.get_or_create(:room => row['location_room'],
                                                                        :row => row['location_row'],
@@ -301,38 +360,45 @@ class ArrearageConverter < Converter
                                                                        :shelf => row['location_shelf']),
           'status' => 'current'
         }
+      else
+
+        if row['indicator_1']
+          # no location info, but we have an indicator
+          # so let's see if we've seen this container before ...
+          unless (tc_uri = ::ArrearageConverter::TopContainerHandler.uri_or_false(:indicator => row['indicator_1'],
+                                                                                  :type => row['type_1']))
+            # no location info and we haven't seen this indicator before, so blow up ...
+            raise "Row (#{row['title']}) has no location for container indicator: #{row['indicator_1']}. " +
+                  "Please fix this and rerun. Aborting import ..."
+          end
+
+        else
+          # no location or container info, so definitely no instance ...
+          return []
+        end
+
       end
 
-      container = {
-        'type_1' => row.fetch('type_1', 'box'),
-        'container_locations' => container_locations,
+      top_container = tc_uri ||
+        ::ArrearageConverter::TopContainerHandler.get_or_create(:indicator => row['indicator_1'],
+                                                                :type => row['type_1'],
+                                                                :container_locations => locations)
+
+      sub_container = {
+        'top_container' => {'ref' => top_container}
       }
 
-      if row['indicator_1']
-        container['indicator_1'] = row['indicator_1']
-      else
-        # We need something...
-        container['barcode_1'] = SecureRandom.hex
-        container['indicator_1'] = 'Unknown'
-      end
-
-
       if row['indicator_2']
-        container['type_2'] = row.fetch('type_2', 'piece')
-        container['indicator_2'] = row['indicator_2']
+        sub_container['type_2'] = row.fetch('type_2', 'piece')
+        sub_container['indicator_2'] = row['indicator_2']
       end
 
 
-      if container['container_locations'].empty? && !row['indicator_1'] && !row['indicator_2']
-        # No container information provided.  No instance to report!
-        return []
-      else
-        [{
-           'jsonmodel_type' => 'instance',
-           'instance_type' => 'graphic_materials',
-           'container' => container
-         }]
-      end
+      [{
+         'jsonmodel_type' => 'instance',
+         'instance_type' => 'graphic_materials',
+         'sub_container' => sub_container
+       }]
     end
 
 
