@@ -175,7 +175,7 @@ class ArrearageConverter < Converter
 
     def self.build(top_container)
       {
-        :type => top_container.fetch(:type, 'box'),
+        :type => top_container.fetch(:type, 'Box'),
         :indicator => top_container.fetch(:indicator, 'Unknown'),
         :container_locations => top_container.fetch(:container_locations, [])
       }
