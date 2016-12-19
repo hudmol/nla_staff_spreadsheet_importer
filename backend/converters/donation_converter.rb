@@ -33,6 +33,8 @@ class DonationConverter < Converter
     @batch = ASpaceImport::RecordBatch.new
     @input_file = input_file
     @records = []
+
+    @top_container_uris = {}
   end
 
 
@@ -188,16 +190,43 @@ class DonationConverter < Converter
   end
 
 
-  def format_box(box_no, box_type)
-    return if box_no.nil?
+  def get_or_create_top_container(type, indicator)
+    if @top_container_uris[type + indicator]
+      @top_container_uris[type + indicator]
+    else
+      uri = "/repositories/12345/top_containers/import_#{SecureRandom.hex}"
 
-    {
-      :instance_type => 'accession',
-      :container => {
-        :type_1 => box_type || 'Box',
-        :indicator_1 => box_no
+      tc_hash = {
+        :uri => uri,
+        :type => type,
+        :indicator => indicator
       }
-    }
+
+      @records << JSONModel::JSONModel(:top_container).from_hash(tc_hash)
+      @top_container_uris[type + indicator] = uri
+
+      uri
+    end
+  end
+
+
+  def format_boxes(box_no, box_type)
+    return [] if box_no.nil?
+
+    # supports this sort of business: 1-2
+    (from_box, to_box) = box_no.split(/\s*\-\s*/, 2)
+    to_box ||= from_box
+
+    (from_box .. to_box).to_a.map do |indicator|
+      {
+        :instance_type => 'accession',
+        :sub_container => {
+          :top_container => {
+            :ref => get_or_create_top_container((box_type || 'Box'), indicator)
+          }
+        }
+      }
+    end
   end
 
 
@@ -221,7 +250,7 @@ class DonationConverter < Converter
     record_hash = {
       :uri => "/repositories/12345/archival_objects/import_#{SecureRandom.hex}",
       :component_id => row['File no/ control no'],
-      :instances => [format_box(row['Box No'], row['Box Type'])].compact,
+      :instances => format_boxes(row['Box No'], row['Box Type']),
       :dates => [format_date(row['Date Range'])].compact,
       :resource => {
         :ref => @resource_uri
