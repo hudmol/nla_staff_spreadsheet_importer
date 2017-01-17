@@ -147,7 +147,7 @@ class DonationConverter < Converter
     })
 
     # consignments don't have these things
-    [:dates, :instances, :component_id].map{|field| class_hash.delete(field)}
+    [:dates, :instances].map{|field| class_hash.delete(field)}
 
     @records << JSONModel::JSONModel(:archival_object).from_hash(class_hash)
 
