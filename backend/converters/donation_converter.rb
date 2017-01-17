@@ -105,7 +105,7 @@ class DonationConverter < Converter
   def get_or_create_resource(office_use_row, title_row)
     office_use_values = row_values(office_use_row)
     title_values = row_values(title_row)
-    identifier_json = JSON(office_use_values[2,3] + [nil, nil])
+    identifier_json = JSON(office_use_values[2, 2] + [nil, nil])
 
     if (resource = Resource[:identifier => identifier_json])
       resource.uri
