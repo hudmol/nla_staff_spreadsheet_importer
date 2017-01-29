@@ -142,7 +142,7 @@ class DonationConverter < Converter
     return @class_uri if row['Consignment'].nil?
 
     class_hash = format_record(row).merge({
-      :title => "Consignment #{row['Consignment']}",
+      :title => row['Consignment'],
       :level => 'class'
     })
 
