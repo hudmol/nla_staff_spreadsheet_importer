@@ -35,6 +35,7 @@ class DonationConverter < Converter
     @records = []
 
     @top_container_uris = {}
+    @container_profile_uris = {}
   end
 
 
@@ -190,6 +191,19 @@ class DonationConverter < Converter
   end
 
 
+  def get_container_profile(type)
+    unless @container_profile_uris.has_key?(type)
+      if (container_profile = ContainerProfile[:name => type])
+        @container_profile_uris[type] = container_profile.uri
+      else
+        @container_profile_uris[type] = false
+      end
+    end
+
+    @container_profile_uris[type]
+  end
+
+
   def get_or_create_top_container(type, indicator)
     if @top_container_uris[type + indicator]
       @top_container_uris[type + indicator]
@@ -198,9 +212,14 @@ class DonationConverter < Converter
 
       tc_hash = {
         :uri => uri,
-        :type => type,
-        :indicator => indicator
+        :indicator => indicator,
       }
+
+      if (container_profile = get_container_profile(type))
+        tc_hash[:container_profile] = { :ref => container_profile }
+      else
+        tc_hash[:type] = type
+      end
 
       @records << JSONModel::JSONModel(:top_container).from_hash(tc_hash)
       @top_container_uris[type + indicator] = uri
