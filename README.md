@@ -8,6 +8,7 @@ It adds three new Import Types to the Import Data Job Type.
   * Arrearage spreadsheet
   * Donor Box List spreadsheet
   * Digital Library Collections CSV
+  * Basic Resource CSV
 
 
 Arrearage spreadsheet
@@ -71,6 +72,17 @@ and top container records.
 A sample CSV file is included here:
 
      https://github.com/hudmol/nla_staff_spreadsheet_importer/blob/master/samples/dlc.csv
+
+
+Basic Resource CSV
+------------------
+
+Takes a CSV file and creates a resource record with no components for each row. The resource record
+includes rights statement, extent, date, and 'scope and contents' note sub-records.
+
+A sample CSV file is included here:
+
+      https://github.com/hudmol/nla_staff_spreadsheet_importer/blob/master/samples/basic_resource.csv
 
 
 ## Installation
