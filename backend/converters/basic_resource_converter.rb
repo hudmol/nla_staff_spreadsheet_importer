@@ -60,8 +60,9 @@ class BasicResourceConverter < Converter
         values_map = Hash[@columns.zip(values)]
 
         # skip header rows
-        next if values_map['title'] == 'resources_basicinformation_title' ||
-                values_map['title'].nil? ||
+        next if values_map['title'].nil? ||
+                values_map['title'].strip == '' ||
+                values_map['title'] == 'resources_basicinformation_title' ||
                 values_map['title'] == 'Title'
 
         create_resource(values_map)
