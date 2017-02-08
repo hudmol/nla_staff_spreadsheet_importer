@@ -4,3 +4,4 @@ en:
     import_type_donation: Donor Box List spreadsheet
     import_type_dlc: Digital Library Collections CSV
     import_type_basic_resource: Basic Resource CSV
+    import_type_obsolete_carriers: Obsolete Carriers CSV
