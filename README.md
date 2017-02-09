@@ -9,6 +9,7 @@ It adds three new Import Types to the Import Data Job Type.
   * Donor Box List spreadsheet
   * Digital Library Collections CSV
   * Basic Resource CSV
+  * Obsolete Carriers CSV
 
 
 Arrearage spreadsheet
@@ -85,6 +86,17 @@ A sample CSV file is included here:
       https://github.com/hudmol/nla_staff_spreadsheet_importer/blob/master/samples/basic_resource.csv
 
 
+Obsolete Carriers CSV
+---------------------
+
+Takes a CSV file and creates collection and item level records. The items include instance, extent and
+'scope and content' note subrecords, and link to agents and subjects.
+
+A sample CSV files is included here:
+
+      https://github.com/hudmol/nla_staff_spreadsheet_importer/blob/master/samples/obsolete_carriers.csv
+
+
 ## Installation
 
 ### From a released version
@@ -123,6 +135,16 @@ directory like this:
 
      cd /path/to/your/archivesspace/plugins
      git clone https://github.com/hudmol/nla_staff_spreadsheet_importer.git nla_staff_spreadsheet_importer
+
+
+## Configuring it
+
+The Obsolete Carriers CSV importer requires a configuration setting. This will be checked at start up.
+
+     AppConfig[:obsolete_carriers_authorizer_agent_uri] = '/agents/corporate_entities/3'
+
+This should include the uri of an agent record in the system. It will be used as the 'authorizer'
+agent for obsolete carrier item records.
 
 
 ## Using it
