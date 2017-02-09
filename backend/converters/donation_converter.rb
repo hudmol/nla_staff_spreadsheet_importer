@@ -191,16 +191,50 @@ class DonationConverter < Converter
   end
 
 
-  def get_container_profile(type)
-    unless @container_profile_uris.has_key?(type)
-      if (container_profile = ContainerProfile[:name => type])
-        @container_profile_uris[type] = container_profile.uri
+  def container_profile_to_type(profile_name)
+    @container_profile_to_type ||= {
+      'Box (Archives)' => 'Box',
+      'Box (Archives - Blue)' => 'Box',
+      'Box (MS)' => 'Box',
+      'Box (Object)' => 'Box',
+      'Box (Letter)' => 'Box',
+      'Phase Box (Small)' => 'Box',
+      'Phase Box (Medium)' => 'Box',
+      'Phase Box (Outsized)' => 'Box',
+      'Cassette Box' => 'Box',
+      'Folio Box (Small)' => 'Folio-Box',
+      'Folio Box (Medium)' => 'Folio-Box',
+      'Folio Box (Large)' => 'Folio-Box',
+      'Carton (Standard)' => 'Carton',
+      'Carton (Outsized)' => 'Carton',
+      'Album' => 'Album',
+      'Negative Box' => 'Negative Box',
+      'Roll' => 'Piece',
+      'Object (Small)' => 'Piece',
+      'Object (Medium)' => 'Piece',
+      'Object (Outsized)' => 'Piece',
+      'Folio (Elephant)' => 'Folio',
+      'Folio (Map)' => 'Folio',
+      'Volume (Standard)' => 'Volume',
+      'Volume (Large)' => 'Volume',
+      'Security Binder' => 'Volume',
+      'Binder (Pictures Blue)' => 'Volume'
+    }
+
+    @container_profile_to_type.fetch(profile_name, profile_name)
+  end
+
+
+  def get_container_profile(name)
+    unless @container_profile_uris.has_key?(name)
+      if (container_profile = ContainerProfile[:name => name])
+        @container_profile_uris[name] = container_profile.uri
       else
-        @container_profile_uris[type] = false
+        @container_profile_uris[name] = false
       end
     end
 
-    @container_profile_uris[type]
+    @container_profile_uris[name]
   end
 
 
@@ -213,12 +247,11 @@ class DonationConverter < Converter
       tc_hash = {
         :uri => uri,
         :indicator => indicator,
+        :type => container_profile_to_type(type),
       }
 
       if (container_profile = get_container_profile(type))
         tc_hash[:container_profile] = { :ref => container_profile }
-      else
-        tc_hash[:type] = type
       end
 
       @records << JSONModel::JSONModel(:top_container).from_hash(tc_hash)
