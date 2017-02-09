@@ -47,7 +47,6 @@ class ObsoleteCarriersConverter < Converter
                   extent_container_summary
                   extent_physical_details
                   extent_dimensions
-                  event_migration
                   subject_genre
                  )
 
@@ -265,6 +264,33 @@ class ObsoleteCarriersConverter < Converter
   end
 
 
+  def create_event(record_uri)
+    uri = "/repositories/12345/events/import_#{SecureRandom.hex}"
+
+    event_hash = {
+      :uri => uri,
+      :event_type => 'ingestion',
+      :outcome => 'fail',
+      :linked_agents => [{
+                           :role => 'authorizer',
+                           :ref => AppConfig[:obsolete_carriers_authorizer_agent_uri]
+                         }],
+      :linked_records => [{
+                            :role => 'source',
+                            :ref => record_uri
+                          }],
+      :date => {
+        :begin => Time.now.strftime('%Y-%m-%d'),
+        :date_type => 'single',
+        :label => 'agent_relation'
+      }
+    }
+
+    @records << JSONModel::JSONModel(:event).from_hash(event_hash)
+    uri
+  end
+
+
   def row_values(row)
     (0...row.size).map {|i| row[i] ? row[i].to_s.strip : nil}
   end
@@ -273,9 +299,11 @@ class ObsoleteCarriersConverter < Converter
   def format_record(row)
 
     raise "No subject provided for '#{row['title']}' (#{row['component_id']})" unless row['subject_genre']
+    
+    uri = "/repositories/12345/archival_objects/import_#{SecureRandom.hex}"
 
     record_hash = {
-      :uri => "/repositories/12345/archival_objects/import_#{SecureRandom.hex}",
+      :uri => uri,
       :title => row['title'],
       :component_id => row['component_id'],
       :level => format_level(row['level']),
@@ -285,9 +313,10 @@ class ObsoleteCarriersConverter < Converter
       :instances => [format_instance(row)].compact,
       :notes => [],
       :subjects => [{ :ref => get_subject_uri(row['subject_genre']) }],
+      :linked_events => [{ :ref => create_event(uri) }],
       :resource => {
         :ref => get_resource(row['resource_id'])
-      },
+      }
     }
 
     if row['scopecontent_note']
