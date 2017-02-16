@@ -311,6 +311,7 @@ class ObsoleteCarriersConverter < Converter
       :dates => [format_date(row['date'])].compact,
       :extents => [format_extent(row)].compact,
       :instances => [format_instance(row)].compact,
+      :dates => [format_date(row['date_expression'])].compact,
       :notes => [],
       :subjects => [{ :ref => get_subject_uri(row['subject_genre']) }],
       :linked_events => [{ :ref => create_event(uri) }],
