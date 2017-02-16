@@ -34,7 +34,7 @@ class ObsoleteCarriersConverter < Converter
                   level
                   resource_id
                   component_id
-                  processing_note
+                  repository_processing_note
                   instance_type
                   container_type
                   container_indicator
