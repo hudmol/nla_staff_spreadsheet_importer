@@ -302,7 +302,7 @@ class DonationConverter < Converter
     record_hash = {
       :uri => "/repositories/12345/archival_objects/import_#{SecureRandom.hex}",
       :component_id => row['File no/ control no'],
-      :instances => format_boxes(row['Box No'], row['Box Type']),
+      :instances => format_boxes(row['Box No'], row['Container Profile']),
       :dates => [format_date(row['Date Range'])].compact,
       :resource => {
         :ref => @resource_uri
