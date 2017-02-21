@@ -271,7 +271,7 @@ class DonationConverter < Converter
 
     (from_box .. to_box).to_a.map do |indicator|
       {
-        :instance_type => 'accession',
+        :instance_type => 'mixed_materials',
         :sub_container => {
           :top_container => {
             :ref => get_or_create_top_container((box_type || 'Box'), indicator)
