@@ -41,6 +41,7 @@ class ObsoleteCarriersConverter < Converter
                   container_barcode
                   title
                   scopecontent_note
+                  processinfo_note
                   date_expression
                   extent_number
                   extent_type
