@@ -229,15 +229,20 @@ class ObsoleteCarriersConverter < Converter
   def format_instance(row)
     return unless row['container_type'] && row['container_indicator']
 
+    sub = {
+      :top_container => {
+        :ref => get_or_create_top_container(row)
+      }
+    }
+
+    if row['container_barcode']
+      sub[:type_2] = 'object'
+      sub[:indicator_2] = row['container_barcode']
+    end
+
     {
       :instance_type => format_instance_type(row['instance_type']),
-      :sub_container => {
-        :type_2 => 'object',
-        :indicator_2 => row['container_barcode'],
-        :top_container => {
-          :ref => get_or_create_top_container(row)
-        }
-      }
+      :sub_container => sub
     }
   end
 
