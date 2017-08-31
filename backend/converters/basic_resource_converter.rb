@@ -121,12 +121,39 @@ class BasicResourceConverter < Converter
 
 
   def format_rights_statement(row)
-    {
-      :rights_type => 'institutional_policy',
-      :permissions => row['access_conditions'],
-      :restrictions => row['use_conditions'],
-      :granted_note => row['granted_note']
-    }
+    if ASConstants.VERSION.start_with?('v1')
+      {
+        :rights_type => 'institutional_policy',
+        :permissions => row['access_conditions'],
+        :restrictions => row['use_conditions'],
+        :granted_note => row['granted_note']
+      }
+    else
+      notes = []
+      if row['access_conditions']
+        notes << {
+          :jsonmodel_type => "note_rights_statement",
+          :label => "Access Conditions (eg Available for Reference. Not for Loan)",
+          :type => 'additional_information',
+          :content => [ row['access_conditions'] ]
+        }
+      end
+      if row['use_conditions']
+        notes << {
+          :jsonmodel_type => "note_rights_statement",
+          :label => "Use Conditions (eg copying not permitted)",
+          :type => 'additional_information',
+          :content => [ row['use_conditions'] ]
+        }
+      end
+
+      {
+        :rights_type => 'other',
+        :other_rights_basis => 'donor',
+        :start_date => Time.now.to_date.iso8601,
+        :notes => notes
+      }
+    end
   end
 
 
