@@ -35,15 +35,30 @@ class BasicResourceConverter < Converter
                   resource_id
                   access_conditions
                   use_conditions
-                  scopecontent_note
+                  granted_note
                   processing_note_1
                   processing_note_2
                   date_expression
                   extent_container_summary
                   extent_number
                   extent_type
+                  note_conditions_governing_access
+                  note_immediate_source_of_acquisition
+                  note_arrangement
+                  note_biographical_historical
+                  note_custodial_history
+                  note_general
+                  note_physical_description
+                  note_preferred_citation
+                  note_related_materials
+                  note_scope_and_content
+                  note_separated_materials
+                  note_conditions_governing_use
+                  note_bibliography
+                  note_existence_and_location_of_copies
+                  note_existence_and_location_of_originals
+                  note_other_finding_aids
                  )
-
   end
 
 
@@ -99,22 +114,26 @@ class BasicResourceConverter < Converter
 
     uri = "/repositories/12345/resources/import_#{SecureRandom.hex}"
 
-    @records << JSONModel::JSONModel(:resource).
-      from_hash({
-                  :uri => uri,
-                  :id_0 => id_a[0],
-                  :id_1 => id_a[1],
-                  :id_2 => id_a[2],
-                  :id_3 => id_a[3],
-                  :title => row['title'],
-                  :level => 'collection',
-                  :repository_processing_note => format_processing_note(row),
-                  :extents => [format_extent(row, :portion => 'whole')].compact,
-                  :dates => [format_date(row['date_expression'])].compact,
-                  :rights_statements => [format_rights_statement(row)].compact,
-                  :notes => [format_scopecontent_note(row)].compact,
-                  :language => 'eng',
-                })
+    record_hash = {
+                :uri => uri,
+                :id_0 => id_a[0],
+                :id_1 => id_a[1],
+                :id_2 => id_a[2],
+                :id_3 => id_a[3],
+                :title => row['title'],
+                :level => 'collection',
+                :repository_processing_note => format_processing_note(row),
+                :extents => [format_extent(row, :portion => 'whole')].compact,
+                :dates => [format_date(row['date_expression'])].compact,
+                :rights_statements => [format_rights_statement(row)].compact,
+                :notes => [],
+                :language => 'eng',
+    }
+
+    # Add all note fields
+    add_notes(record_hash, row)
+
+    @records << JSONModel::JSONModel(:resource).from_hash(record_hash)
 
   end
 
@@ -135,6 +154,14 @@ class BasicResourceConverter < Converter
         :label => "Use Conditions (eg copying not permitted)",
         :type => 'additional_information',
         :content => [ row['use_conditions'] ]
+      }
+    end
+    if row['granted_note']
+      notes << {
+        :jsonmodel_type => "note_rights_statement",
+        :label => "Granted Notes",
+        :type => 'additional_information',
+        :content => [ row['granted_note'] ]
       }
     end
 
@@ -174,17 +201,54 @@ class BasicResourceConverter < Converter
     }
   end
 
+  def add_notes(record_hash, row)
 
-  def format_scopecontent_note(row)
-    return unless row['scopecontent_note']
-    {
-      :jsonmodel_type => 'note_multipart',
-      :type => 'scopecontent',
-      :subnotes =>[{
-                     :jsonmodel_type => 'note_text',
-                     :content => row['scopecontent_note']
-                   }]
-    }
+    fields = [['note_conditions_governing_access', 'note_multipart', 'accessrestrict'],
+              ['note_immediate_source_of_acquisition', 'note_multipart', 'acqinfo'],
+              ['note_arrangement', 'note_multipart', 'arrangement'],
+              ['note_biographical_historical', 'note_multipart', 'bioghist'],
+              ['note_custodial_history', 'note_multipart', 'custodhist'],
+              ['note_general', 'note_multipart', 'odd'],
+              ['note_physical_description', 'note_singlepart', 'physdesc'],
+              ['note_preferred_citation', 'note_multipart', 'prefercite'],
+              ['note_related_materials', 'note_multipart', 'relatedmaterial'],
+              ['note_scope_and_content', 'note_multipart', 'scopecontent'],
+              ['note_separated_materials', 'note_multipart', 'separatedmaterial'],
+              ['note_conditions_governing_use', 'note_multipart', 'userestrict'],
+              ['note_bibliography', 'note_bibliography', 'bibliography'],
+              ['note_existence_and_location_of_copies', 'note_multipart', 'altformavail'],
+              ['note_existence_and_location_of_originals', 'note_multipart', 'originalsloc'],
+              ['note_other_finding_aids', 'note_multipart', 'otherfindaid']
+      ]
+
+      fields.each { |f| add_note(record_hash, row[f[0]], f[1], f[2])}
+
+  end
+
+
+  def add_note(record_hash, data, model_type, note_type)
+    if data
+      if model_type == 'note_multipart'
+        json_rec = {
+          :jsonmodel_type => model_type,
+          :type => note_type,
+          :subnotes =>[{
+                        :jsonmodel_type => 'note_text',
+                        :content => data
+                       }]
+        }
+      elsif model_type == 'note_singlepart' || model_type == 'note_bibliography'
+        json_rec = {
+          :jsonmodel_type => model_type,
+          :type => note_type,
+          :content => [ data ]
+        }
+      else
+        json_rec = {}
+      end
+
+      record_hash[:notes] << json_rec
+    end
   end
 
 
@@ -220,7 +284,6 @@ class BasicResourceConverter < Converter
                      }]
       }
     end
-
 
     record_hash
   end
