@@ -1,7 +1,11 @@
 NLA Staff Spreadsheet Importer Plugin
 =====================================
 
-An ArchivesSpace (v2.1.x) plugin developed for the National Library of Australia by Hudson Molonglo.
+An ArchivesSpace (v2.1.x) plugin developed for the National Library of Australia.
+
+It was originally written and maintained by Hudson Molonglo (https://github.com/hudmol/nla_staff_spreadsheet_importer).
+
+After release 2.0, it was moved to and maintained by the NLA.
 
 It adds the following Import Types to the Import Data Job Type.
 
