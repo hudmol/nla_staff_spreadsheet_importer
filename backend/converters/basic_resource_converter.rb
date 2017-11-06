@@ -47,7 +47,9 @@ class BasicResourceConverter < Converter
                   note_arrangement
                   note_biographical_historical
                   note_custodial_history
-                  note_general
+                  note_general_subjects
+                  note_general_archival_history
+                  note_general_fa_notes
                   note_physical_description
                   note_preferred_citation
                   note_related_materials
@@ -201,50 +203,50 @@ class BasicResourceConverter < Converter
     }
   end
 
-  def add_notes(record_hash, row)
 
-    fields = [['note_conditions_governing_access', 'note_multipart', 'accessrestrict'],
-              ['note_immediate_source_of_acquisition', 'note_multipart', 'acqinfo'],
-              ['note_arrangement', 'note_multipart', 'arrangement'],
-              ['note_biographical_historical', 'note_multipart', 'bioghist'],
-              ['note_custodial_history', 'note_multipart', 'custodhist'],
-              ['note_general', 'note_multipart', 'odd'],
-              ['note_physical_description', 'note_singlepart', 'physdesc'],
-              ['note_preferred_citation', 'note_multipart', 'prefercite'],
-              ['note_related_materials', 'note_multipart', 'relatedmaterial'],
-              ['note_scope_and_content', 'note_multipart', 'scopecontent'],
-              ['note_separated_materials', 'note_multipart', 'separatedmaterial'],
-              ['note_conditions_governing_use', 'note_multipart', 'userestrict'],
-              ['note_bibliography', 'note_bibliography', 'bibliography'],
-              ['note_existence_and_location_of_copies', 'note_multipart', 'altformavail'],
-              ['note_existence_and_location_of_originals', 'note_multipart', 'originalsloc'],
-              ['note_other_finding_aids', 'note_multipart', 'otherfindaid']
+  def add_notes(record_hash, row)
+    fields = [['note_conditions_governing_access', 'note_multipart', 'accessrestrict', nil],
+              ['note_immediate_source_of_acquisition', 'note_multipart', 'acqinfo', nil],
+              ['note_arrangement', 'note_multipart', 'arrangement', nil],
+              ['note_biographical_historical', 'note_multipart', 'bioghist', nil],
+              ['note_custodial_history', 'note_multipart', 'custodhist', nil],
+              ['note_general_subjects', 'note_multipart', 'odd', 'Subjects'],
+              ['note_general_archival_history', 'note_multipart', 'odd', 'Archival History'],
+              ['note_general_fa_notes', 'note_multipart', 'odd', 'Finding-aid Notes'],
+              ['note_physical_description', 'note_singlepart', 'physdesc', nil],
+              ['note_preferred_citation', 'note_multipart', 'prefercite', nil],
+              ['note_related_materials', 'note_multipart', 'relatedmaterial', nil],
+              ['note_scope_and_content', 'note_multipart', 'scopecontent', nil],
+              ['note_separated_materials', 'note_multipart', 'separatedmaterial', nil],
+              ['note_conditions_governing_use', 'note_multipart', 'userestrict', nil],
+              ['note_bibliography', 'note_bibliography', 'bibliography', nil],
+              ['note_existence_and_location_of_copies', 'note_multipart', 'altformavail', nil],
+              ['note_existence_and_location_of_originals', 'note_multipart', 'originalsloc', nil],
+              ['note_other_finding_aids', 'note_multipart', 'otherfindaid', nil]
       ]
 
-      fields.each { |f| add_note(record_hash, row[f[0]], f[1], f[2])}
-
+      fields.each { |f| add_note(record_hash, row[f[0]], f[1], f[2], f[3])}
   end
 
 
-  def add_note(record_hash, data, model_type, note_type)
-    if data
+  def add_note(record_hash, data, model_type, note_type, note_label)
+    if data && (model_type == 'note_multipart' || model_type == 'note_singlepart' || model_type == 'note_bibliography')
+      json_rec = {
+        :jsonmodel_type => model_type,
+        :type => note_type,
+      }
+
       if model_type == 'note_multipart'
-        json_rec = {
-          :jsonmodel_type => model_type,
-          :type => note_type,
-          :subnotes =>[{
-                        :jsonmodel_type => 'note_text',
-                        :content => data
-                       }]
-        }
-      elsif model_type == 'note_singlepart' || model_type == 'note_bibliography'
-        json_rec = {
-          :jsonmodel_type => model_type,
-          :type => note_type,
-          :content => [ data ]
-        }
+        json_rec[:subnotes] = [{
+                                :jsonmodel_type => 'note_text',
+                                :content => data
+                                }]
       else
-        json_rec = {}
+        json_rec[:content] = [ data ]
+      end
+
+      if (note_label)
+        json_rec[:label] = note_label
       end
 
       record_hash[:notes] << json_rec
