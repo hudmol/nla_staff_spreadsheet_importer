@@ -35,7 +35,7 @@ following types of records within ArchivesSpace:
 
 You can find the supported spreadsheet format here:
 
-     https://github.com/hudmol/nla_staff_spreadsheet_importer/blob/master/samples/Arrearage%20Template.xlsx
+     https://github.com/nla/nla_staff_spreadsheet_importer/blob/master/samples/Arrearage%20Template.xlsx
 
 The row labelled **ArchivesSpace field code** (marked in grey) is
 responsible for mapping each column to a field that the importer knows
@@ -60,11 +60,11 @@ Takes a spreadsheet describing donated collections. A template is provided
 to the donor for completion. It is then imported by NLA staff. The template
 is included here:
 
-     https://github.com/hudmol/nla_staff_spreadsheet_importer/blob/master/samples/Donor%20Box%20List%20Template.xlsx
+     https://github.com/nla/nla_staff_spreadsheet_importer/blob/master/samples/Donor%20Box%20List%20Template.xlsx
 
 And there are a few examples showing different structures included in the samples directory also:
 
-     https://github.com/hudmol/nla_staff_spreadsheet_importer/tree/master/samples
+     https://github.com/nla/nla_staff_spreadsheet_importer/tree/master/samples
 
 
 Digital Library Collections CSV
@@ -76,7 +76,7 @@ and top container records.
 
 A sample CSV file is included here:
 
-     https://github.com/hudmol/nla_staff_spreadsheet_importer/blob/master/samples/dlc.csv
+     https://github.com/nla/nla_staff_spreadsheet_importer/blob/master/samples/dlc.csv
 
 
 Basic Resource CSV
@@ -87,7 +87,7 @@ includes rights statement, extent, date, and 'scope and contents' note sub-recor
 
 A sample CSV file is included here:
 
-      https://github.com/hudmol/nla_staff_spreadsheet_importer/blob/master/samples/basic_resource.csv
+      https://github.com/nla/nla_staff_spreadsheet_importer/blob/master/samples/basic_resource.csv
 
 
 Obsolete Carriers CSV
@@ -98,7 +98,7 @@ Takes a CSV file and creates collection and item level records. The items includ
 
 A sample CSV files is included here:
 
-      https://github.com/hudmol/nla_staff_spreadsheet_importer/blob/master/samples/obsolete_carriers.csv
+      https://github.com/nla/nla_staff_spreadsheet_importer/blob/master/samples/obsolete_carriers.csv
 
 
 ## Installation
@@ -106,7 +106,7 @@ A sample CSV files is included here:
 ### From a released version
 
 Download the latest plugin release from the
-[GitHub releases page](https://github.com/hudmol/nla_staff_spreadsheet_importer/releases).
+[GitHub releases page](https://github.com/nla/nla_staff_spreadsheet_importer/releases).
 It will be named something snappy like
 `nla_staff_spreadsheet_importer-v0.1.zip`.
 
@@ -138,7 +138,7 @@ clone the repository straight into your ArchivesSpace `plugins`
 directory like this:
 
      cd /path/to/your/archivesspace/plugins
-     git clone https://github.com/hudmol/nla_staff_spreadsheet_importer.git nla_staff_spreadsheet_importer
+     git clone https://github.com/nla/nla_staff_spreadsheet_importer.git nla_staff_spreadsheet_importer
 
 
 ## Configuring it
