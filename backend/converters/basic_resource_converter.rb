@@ -1,5 +1,8 @@
 class BasicResourceConverter < Converter
 
+  AUS_date_pat1 = '(\d{1,2}/)?(\d{1,2}/)(\d{4})'
+  AUS_date_pat2 = '(\d{1,2}-)?(\d{1,2}-)(\d{4})'
+
   def self.instance_for(type, input_file)
     if type == "basic_resource"
       self.new(input_file)
@@ -39,6 +42,8 @@ class BasicResourceConverter < Converter
                   processing_note_1
                   processing_note_2
                   date_expression
+                  date_begin
+                  date_end
                   extent_container_summary
                   extent_number
                   extent_type
@@ -126,7 +131,7 @@ class BasicResourceConverter < Converter
                 :level => 'collection',
                 :repository_processing_note => format_processing_note(row),
                 :extents => [format_extent(row, :portion => 'whole')].compact,
-                :dates => [format_date(row['date_expression'])].compact,
+                :dates => [format_date(row['date_expression'], row['date_begin'], row['date_end'])].compact,
                 :rights_statements => [format_rights_statement(row)].compact,
                 :notes => [],
                 :language => 'eng',
@@ -181,14 +186,24 @@ class BasicResourceConverter < Converter
   end
 
 
-  def format_date(date_string)
-    return if date_string.nil?
+  def format_date(date_expression, date_begin, date_end)
+    return if date_expression.nil? && date_begin.nil? && date_end.nil?
 
     {
-      :date_type => date_string =~ /-/ ? 'inclusive' : 'single',
+      :date_type => date_expression =~ /-/ || !(date_begin.nil? || date_end.nil?) ? 'inclusive' : 'single',
       :label => 'creation',
-      :expression => date_string || "No date provided"
+      :expression => date_expression,
+      :begin => convert_date_format(date_begin),
+      :end => convert_date_format(date_end)
     }
+  end
+
+  def convert_date_format(date_str)
+    if date_str =~ /#{AUS_date_pat1}/ || date_str =~ /#{AUS_date_pat2}/
+      $3 + '-' + $2[0..-2] + ($1.nil? ? '' : '-' + $1[0..-2])
+    else
+      date_str
+    end
   end
 
 
