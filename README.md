@@ -1,9 +1,9 @@
 NLA Staff Spreadsheet Importer Plugin
 =====================================
 
-An ArchivesSpace (v1.5.2) plugin developed for the National Library of Australia by Hudson Molonglo.
+An ArchivesSpace (v2.1.x) plugin developed for the National Library of Australia by Hudson Molonglo.
 
-It adds three new Import Types to the Import Data Job Type.
+It adds the following Import Types to the Import Data Job Type.
 
   * Arrearage spreadsheet
   * Donor Box List spreadsheet
