@@ -35,6 +35,8 @@ class ArrearageConverter < Converter
     super
     @batch = ASpaceImport::RecordBatch.new
     @input_file = input_file
+    TopContainerHandler.init
+    LocationHandler.init
   end
 
 
@@ -140,31 +142,37 @@ class ArrearageConverter < Converter
 
   class LocationHandler
 
-    def self.get_or_create(location)
-      aspace_location = {:building => "NLA",
-                         :room => location[:room],
-                         :coordinate_1_label => "Row",
-                         :coordinate_1_indicator => location[:row],
-                         :coordinate_2_label => "Unit",
-                         :coordinate_2_indicator => location[:unit],
-                         :coordinate_3_label => "Shelf/Drawer",
-                         :coordinate_3_indicator => location[:shelf]}
-
-      if (location = Location[aspace_location])
-        location.uri
-      else
-        Location.create_from_json(JSONModel::JSONModel(:location).from_hash(aspace_location)).uri
-      end
+    def self.init
+      @locations = {}
     end
 
+    def self.get_or_create(location_hash)
+      loc_key = location_hash
+
+      return @locations[loc_key] if @locations.has_key?(loc_key)
+
+      aspace_location = {:building => "NLA",
+                         :room => location_hash[:room],
+                         :coordinate_1_label => "Row",
+                         :coordinate_1_indicator => location_hash[:row],
+                         :coordinate_2_label => "Unit",
+                         :coordinate_2_indicator => location_hash[:unit],
+                         :coordinate_3_label => "Shelf/Drawer",
+                         :coordinate_3_indicator => location_hash[:shelf]}
+
+      location = Location[aspace_location] || Location.create_from_json(JSONModel::JSONModel(:location).from_hash(aspace_location))
+
+      @locations[loc_key] = location.uri
+    end
   end
 
 
   class TopContainerHandler
 
-    # sorry
+    def self.init
+      @top_containers = {}
+    end
 
-    @@top_containers = {}
 
     def self.key_for(top_container)
       key = "#{top_container[:type]}: #{top_container[:indicator]}"
@@ -183,7 +191,7 @@ class ArrearageConverter < Converter
 
 
     def self.uri_or_false(top_container)
-      tc = @@top_containers.fetch(key_for(build(top_container)), false)
+      tc = @top_containers.fetch(key_for(build(top_container)), false)
       return false unless tc
       tc[:uri]
     end
@@ -199,7 +207,11 @@ class ArrearageConverter < Converter
 
       tc_key = key_for(tc)
 
-      if existing_tc = @@top_containers.fetch(tc_key, false)
+      if existing_tc = @top_containers.fetch(tc_key, false)
+
+        require 'pp'
+        pp existing_tc
+        pp tc
 
         if existing_tc[:container_locations].first['ref'] != tc[:container_locations].first['ref']
           raise "Found two containers with the same type and indicator (#{tc_key}) but different locations. " +
@@ -210,7 +222,7 @@ class ArrearageConverter < Converter
 
       else
         tc[:uri] = TopContainer.create_from_json(JSONModel::JSONModel(:top_container).from_hash(tc)).uri
-        @@top_containers[tc_key] = tc
+        @top_containers[tc_key] = tc
         tc[:uri]
       end
     end
@@ -586,7 +598,7 @@ class ArrearageConverter < Converter
       import_uri = "/repositories/12345/archival_objects/import_#{SecureRandom.hex}"
       jsonmodel['uri'] = import_uri
       jsonmodel['position'] = (context[:position] += 1)
-
+      jsonmodel['publish'] = false
 
       component_id = [row['component_id'], row['item_id']].compact.join("")
 
